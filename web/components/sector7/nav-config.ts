@@ -12,6 +12,7 @@ export const PRIMARY_NAV: NavItem[] = [
   { href: "/sensors", label: "Sensors", icon: "videocam" },
   { href: "/reactor", label: "Reactor", icon: "power" },
   { href: "/events", label: "Events", icon: "list_alt" },
+  { href: "/guide", label: "Guide", icon: "menu_book" },
 ];
 
 export const SECONDARY_NAV: NavItem[] = [
