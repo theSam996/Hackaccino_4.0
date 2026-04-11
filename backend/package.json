@@ -1,12 +1,14 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "Cyber-Physical Nuclear Plant Anomaly Detection System — Node.js Backend",
   "main": "index.js",
   
   "scripts": {
     "start": "node src/server.js",
-    "dev":   "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "train": "python3 ml/train_model.py",
+    "gen-data": "python3 ml/generate_dataset.py"
   },
 
   "keywords": [],
