@@ -14,14 +14,15 @@ This project is a real-time, mission-critical prototype designed to detect sophi
  
 ## 4. MVP Core Features
 To ensure a complete and polished prototype within the hackathon time limit, the scope is strictly limited to the following core deliverables:
-Feature	Description	Priority
-Synthetic Data Engine	A script generating continuous, synchronized CSV data for both "Normal" baseline operations and "Attack" scenarios (divergent physical/IT data).	P0 (Critical)
-Real-Time Data Stream	A high-performance, uni-directional data pipeline delivering telemetry to the client without heavy bi-directional overhead.	P0 (Critical)
-ML Anomaly Detection	A lightweight algorithm trained on baseline data to detect multi-dimensional discrepancies the moment the attack payload is injected.	P0 (Critical)
-Mobile Command Dashboard	A high-contrast mobile UI displaying live telemetry charts, ensuring facility managers can monitor operations securely.	P1 (High)
-Emergency Override Protocol	A visual alert system that overrides the mobile screen with lockdown warnings and push notifications upon anomaly detection.	P1 (High)
-Demo Trigger System	A manual "Inject Payload" button to seamlessly transition the prototype from normal operations to the attack state during the final pitch.	P1 (High)
- 
+
+| Feature                    | Description                                                                                                                                         | Priority        |
+|---------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|
+| Synthetic Data Engine     | A script generating continuous, synchronized CSV data for both "Normal" baseline operations and "Attack" scenarios (divergent physical/IT data). | P0 (Critical)   |
+| Real-Time Data Stream     | A high-performance, uni-directional data pipeline delivering telemetry to the client without heavy bi-directional overhead.                      | P0 (Critical)   |
+| ML Anomaly Detection      | A lightweight algorithm trained on baseline data to detect multi-dimensional discrepancies the moment the attack payload is injected.            | P0 (Critical)   |
+| Mobile Command Dashboard  | A high-contrast mobile UI displaying live telemetry charts, ensuring facility managers can monitor operations securely.                          | P1 (High)       |
+| Emergency Override Protocol | A visual alert system that overrides the mobile screen with lockdown warnings and push notifications upon anomaly detection.                   | P1 (High)       |
+| Demo Trigger System       | A manual "Inject Payload" button to seamlessly transition the prototype from normal operations to the attack state during the final pitch.      | P1 (High)       |
 ## 5. Technical Architecture
 The stack is optimized for speed of development, low latency, and a highly polished presentation.
 Component	Technology	Role
