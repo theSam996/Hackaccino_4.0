@@ -1,12 +1,21 @@
 "use client";
 
+import {
+  OperatorPreferencesProvider,
+  SITE_ZONES_NO_ALL,
+} from "@/contexts/OperatorPreferencesContext";
+import { TelemetryProvider } from "@/contexts/TelemetryContext";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { BlueprintBackdrop } from "./BlueprintBackdrop";
+import { HeaderActions } from "./HeaderActions";
+import { HeaderTelemetryStatus } from "./HeaderTelemetryStatus";
+import { LiveGlobalStrip } from "./LiveGlobalStrip";
 import { PRIMARY_NAV, SECONDARY_NAV, titleForPath } from "./nav-config";
-
-const SILO_LINKS = ["Silo A1", "Silo A2", "Grid B", "External"] as const;
+import { SidebarInjectButton } from "./SidebarInjectButton";
+import { SiteZoneControls } from "./SiteZoneControls";
+import { SiteZoneFooter } from "./SiteZoneFooter";
 
 function NavLink({
   href,
@@ -40,7 +49,7 @@ function NavLink({
   );
 }
 
-export function Sector7Shell({ children }: { children: React.ReactNode }) {
+function Sector7ShellInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -124,15 +133,7 @@ export function Sector7Shell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="border-t border-white/5 px-4 py-4 sm:px-6 sm:py-6">
-          <button
-            type="button"
-            className="w-full bg-white py-3 font-label text-xs font-bold uppercase tracking-wider text-on-primary transition-transform hover:opacity-90 active:scale-[0.98] lg:text-sm"
-            onClick={() => {
-              void fetch("/api/telemetry/inject-payload", { method: "POST" });
-            }}
-          >
-            SYSTEM OVERRIDE
-          </button>
+          <SidebarInjectButton />
         </div>
 
         <div className="space-y-1 p-3 sm:p-4">
@@ -148,7 +149,7 @@ export function Sector7Shell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <header className="fixed left-0 right-0 top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-white/5 bg-stone-950/80 px-3 backdrop-blur-md sm:px-4 lg:left-64 lg:border-b-0 lg:px-6">
+      <header className="fixed left-0 right-0 top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-white/5 bg-stone-950/80 px-3 backdrop-blur-md sm:px-4 lg:left-64 lg:border-b-0 lg:px-6 lg:pr-8">
         <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-4 lg:gap-8">
           <button
             type="button"
@@ -174,74 +175,45 @@ export function Sector7Shell({ children }: { children: React.ReactNode }) {
             className="-mx-1 hidden min-w-0 flex-1 overflow-x-auto px-1 lg:mx-0 lg:flex lg:overflow-visible"
             aria-label="Site zones"
           >
-            <div className="flex gap-4 lg:gap-6">
-              {SILO_LINKS.map((label, i) => (
-                <a
-                  key={label}
-                  href="#"
-                  className={`shrink-0 whitespace-nowrap py-1 font-headline text-sm font-bold lg:text-base ${
-                    i === 0
-                      ? "border-b border-blue-400 text-blue-400"
-                      : "text-stone-400 hover:text-white"
-                  }`}
-                >
-                  {label}
-                </a>
-              ))}
-            </div>
+            <SiteZoneControls
+              variant="header"
+              className="gap-3 lg:gap-4"
+              zones={SITE_ZONES_NO_ALL}
+            />
           </nav>
         </div>
-        <div className="flex shrink-0 items-center gap-2 sm:gap-4">
-          <div className="hidden items-center gap-2 bg-stone-800 px-2 py-1.5 sm:flex sm:gap-3 sm:px-3">
-            <span className="h-2 w-2 shrink-0 rounded-full bg-secondary shadow-[0_0_8px_#5ed4ff]" />
-            <span className="hidden font-mono text-[10px] uppercase tracking-widest text-on-surface-variant md:inline">
-              ELEVATED STATUS
-            </span>
-          </div>
-          <div className="flex gap-0.5 sm:gap-2">
-            <button
-              type="button"
-              className="p-2 text-stone-400 transition-colors hover:text-white"
-              aria-label="Notifications"
-            >
-              <span className="material-symbols-outlined text-sm">
-                notifications_active
-              </span>
-            </button>
-            <button
-              type="button"
-              className="p-2 text-stone-400 transition-colors hover:text-white"
-              aria-label="Admin"
-            >
-              <span className="material-symbols-outlined text-sm">
-                admin_panel_settings
-              </span>
-            </button>
-          </div>
+        <div className="relative flex shrink-0 items-center gap-2 sm:gap-4">
+          <HeaderTelemetryStatus />
+          <HeaderActions />
         </div>
       </header>
 
-      <main className="ml-0 min-h-dvh overflow-x-hidden bg-surface-dim px-4 pb-8 pt-14 sm:px-5 sm:pb-10 lg:ml-64 lg:px-6 lg:pb-8">
+      <main className="ml-0 min-h-dvh overflow-x-hidden bg-surface-dim px-4 pb-24 pt-14 sm:px-5 sm:pb-28 lg:ml-64 lg:px-6 lg:pb-24">
         <div
-          className="-mx-4 mb-4 flex gap-4 overflow-x-auto border-b border-outline-variant/20 px-4 pb-3 sm:-mx-5 sm:px-5 lg:hidden"
+          className="-mx-4 mb-4 flex flex-col gap-2 overflow-x-auto border-b border-outline-variant/20 px-4 pb-3 sm:-mx-5 sm:px-5 lg:hidden"
           aria-label="Site zones (mobile)"
         >
-          {SILO_LINKS.map((label, i) => (
-            <a
-              key={label}
-              href="#"
-              className={`shrink-0 whitespace-nowrap font-headline text-[10px] font-bold uppercase tracking-wide sm:text-xs ${
-                i === 0 ? "text-blue-400" : "text-stone-500"
-              }`}
-            >
-              {label}
-            </a>
-          ))}
+          <span className="font-label text-[9px] uppercase tracking-widest text-stone-500">
+            Zone focus
+          </span>
+          <SiteZoneControls variant="mobile" />
         </div>
+        <LiveGlobalStrip />
         {children}
       </main>
 
+      <SiteZoneFooter />
       <BlueprintBackdrop />
     </>
+  );
+}
+
+export function Sector7Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <TelemetryProvider>
+      <OperatorPreferencesProvider>
+        <Sector7ShellInner>{children}</Sector7ShellInner>
+      </OperatorPreferencesProvider>
+    </TelemetryProvider>
   );
 }
