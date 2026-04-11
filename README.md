@@ -25,12 +25,14 @@ To ensure a complete and polished prototype within the hackathon time limit, the
 | Demo Trigger System       | A manual "Inject Payload" button to seamlessly transition the prototype from normal operations to the attack state during the final pitch.      | P1 (High)       |
 ## 5. Technical Architecture
 The stack is optimized for speed of development, low latency, and a highly polished presentation.
-Component	Technology	Role
-Backend API	Python / FastAPI	Serves the data streams and handles the ML inference requests efficiently.
-Data Streaming	Server-Sent Events (SSE)	Pushes real-time telemetry from the backend to the mobile client natively.
-Machine Learning	scikit-learn (Isolation Forest)	Analyzes data streams for outliers without requiring massive training times.
-Frontend/Mobile	Flutter	Powers the responsive, cross-platform mobile dashboard and dynamic UI animations.
-Data Generation	NumPy / Pandas	Simulates the hardware sensors and IT network logs for the demo.
+
+| Component         | Technology                         | Role                                                                                                      |
+|------------------|----------------------------------|-----------------------------------------------------------------------------------------------------------|
+| Backend API      | Python / FastAPI                 | Serves the data streams and handles the ML inference requests efficiently.                              |
+| Data Streaming   | Server-Sent Events (SSE)         | Pushes real-time telemetry from the backend to the mobile client natively.                              |
+| Machine Learning | scikit-learn (Isolation Forest)  | Analyzes data streams for outliers without requiring massive training times.                            |
+| Frontend/Mobile  | Flutter                          | Powers the responsive, cross-platform mobile dashboard and dynamic UI animations.                       |
+| Data Generation  | NumPy / Pandas                   | Simulates the hardware sensors and IT network logs for the demo.                                         |
  
 ## 6. User Demo Flow
 This is the precise sequence of events for the final hackathon presentation:
