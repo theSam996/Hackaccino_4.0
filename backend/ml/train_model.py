@@ -13,7 +13,16 @@ import joblib
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from sklearn.ensemble import IsolationForest
+try:
+    import torch
+    import torch.nn as nn
+    import torch.optim as optim
+    from torch.utils.data import DataLoader, TensorDataset
+    USE_TORCH = True
+except ImportError:
+    USE_TORCH = False
+    from sklearn.ensemble import IsolationForest
+
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import classification_report, confusion_matrix, mean_squared_error
 
@@ -109,20 +118,93 @@ rmse_normal = compute_rmse(normal_df, "Normal Baseline")
 scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 
-# ── Train Isolation Forest ────────────────────────────────────────────────────
-print("\nTraining Isolation Forest ...")
-model = IsolationForest(
-    n_estimators=200,      # more trees = more stable scores
-    contamination=0.02,    # ~2% of training data treated as outliers
-    max_samples="auto",
-    random_state=42,
-    n_jobs=-1,
-)
-model.fit(X_train_scaled)
-print("[✓] Model trained")
+# ── Train Model ────────────────────────────────────────────────────
+if USE_TORCH:
+    print("\nTraining Autoencoder on GPU (if available) ...")
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}")
+
+    class Autoencoder(nn.Module):
+        def __init__(self, input_dim):
+            super().__init__()
+            self.encoder = nn.Sequential(
+                nn.Linear(input_dim, 8),
+                nn.ReLU(),
+                nn.Linear(8, 4),
+                nn.ReLU()
+            )
+            self.decoder = nn.Sequential(
+                nn.Linear(4, 8),
+                nn.ReLU(),
+                nn.Linear(8, input_dim)
+            )
+        def forward(self, x):
+            return self.decoder(self.encoder(x))
+
+    model = Autoencoder(X_train_scaled.shape[1]).to(device)
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.01)
+
+    X_tensor = torch.tensor(X_train_scaled, dtype=torch.float32)
+    dataset = TensorDataset(X_tensor, X_tensor)
+    loader = DataLoader(dataset, batch_size=32, shuffle=True)
+
+    epochs = 20
+    for epoch in range(epochs):
+        model.train()
+        train_loss = 0.0
+        for batch_x, batch_y in loader:
+            batch_x, batch_y = batch_x.to(device), batch_y.to(device)
+            optimizer.zero_grad()
+            outputs = model(batch_x)
+            loss = criterion(outputs, batch_y)
+            loss.backward()
+            optimizer.step()
+            train_loss += loss.item() * batch_x.size(0)
+        
+        train_loss /= len(loader.dataset)
+        print(f"  Epoch [{epoch+1}/{epochs}] Loss: {train_loss:.6f} (GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'})")
+
+    print("[✓] Autoencoder model trained")
+    
+    # Convert model back to CPU for saving
+    model.to('cpu')
+    # Save a torch model wrapper to joblib or save state dict
+    torch.save(model.state_dict(), MODEL_DIR / "autoencoder.pth")
+    # For predicting backwards compatibility locally
+    class TorchModelWrapper:
+        def __init__(self, pt_model):
+            self.pt_model = pt_model
+        def decision_function(self, X):
+            self.pt_model.eval()
+            with torch.no_grad():
+                Xt = torch.tensor(X, dtype=torch.float32)
+                recon = self.pt_model(Xt)
+                mse = torch.mean((Xt - recon) ** 2, dim=1).numpy()
+                return -mse # Negative MSE so large error = low score
+                
+        def predict(self, X):
+            scores = self.decision_function(X)
+            # -1 for anomaly (MSE > threshold), 1 for normal
+            return np.where(scores < -0.05, -1, 1)
+
+    wrapped_model = TorchModelWrapper(model)
+    model = wrapped_model
+    joblib.dump('torch_model', MODEL_PATH)
+else:
+    print("\nTraining Isolation Forest ...")
+    model = IsolationForest(
+        n_estimators=200,      # more trees = more stable scores
+        contamination=0.02,    # ~2% of training data treated as outliers
+        max_samples="auto",
+        random_state=42,
+        n_jobs=-1,
+    )
+    model.fit(X_train_scaled)
+    print("[✓] Model trained")
+    joblib.dump(model, MODEL_PATH)
 
 # ── Save model + scaler ───────────────────────────────────────────────────────
-joblib.dump(model,  MODEL_PATH)
 joblib.dump(scaler, SCALER_PATH)
 print(f"[✓] Model saved  → {MODEL_PATH}")
 print(f"[✓] Scaler saved → {SCALER_PATH}")

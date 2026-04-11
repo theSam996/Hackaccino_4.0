@@ -32,6 +32,12 @@ import json
 import joblib
 import numpy as np
 from pathlib import Path
+try:
+    import torch
+    import torch.nn as nn
+    USE_TORCH = True
+except ImportError:
+    USE_TORCH = False
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 BASE_DIR    = Path(__file__).parent.parent
@@ -42,6 +48,28 @@ SCALER_PATH = BASE_DIR / "models" / "scaler.pkl"
 try:
     model  = joblib.load(MODEL_PATH)
     scaler = joblib.load(SCALER_PATH)
+
+    if USE_TORCH and (BASE_DIR / "models" / "autoencoder.pth").exists():
+        class Autoencoder(nn.Module):
+            def __init__(self, input_dim):
+                super().__init__()
+                self.encoder = nn.Sequential(nn.Linear(input_dim, 8), nn.ReLU(), nn.Linear(8, 4), nn.ReLU())
+                self.decoder = nn.Sequential(nn.Linear(4, 8), nn.ReLU(), nn.Linear(8, input_dim))
+            def forward(self, x):
+                return self.decoder(self.encoder(x))
+        pt_model = Autoencoder(4)
+        pt_model.load_state_dict(torch.load(BASE_DIR / "models" / "autoencoder.pth"))
+        pt_model.eval()
+        
+        class TorchPredictWrapper:
+            def decision_function(self, X):
+                with torch.no_grad():
+                    Xt = torch.tensor(X, dtype=torch.float32)
+                    recon = pt_model(Xt)
+                    mse = torch.mean((Xt - recon) ** 2, dim=1).numpy()
+                    return -mse
+        model = TorchPredictWrapper()
+
 except FileNotFoundError as e:
     print(json.dumps({"error": f"Model not found: {e}. Run: python ml/train_model.py"}))
     sys.exit(1)
@@ -91,17 +119,17 @@ def predict(data: dict) -> dict:
 
 # ── Read from stdin, write to stdout ──────────────────────────────────────────
 if __name__ == "__main__":
-    try:
-        raw_input = sys.stdin.read().strip()
-        data = json.loads(raw_input)
-        result = predict(data)
-        print(json.dumps(result))
-    except json.JSONDecodeError as e:
-        print(json.dumps({"error": f"Invalid JSON input: {e}"}))
-        sys.exit(1)
-    except KeyError as e:
-        print(json.dumps({"error": f"Missing field in input: {e}"}))
-        sys.exit(1)
-    except Exception as e:
-        print(json.dumps({"error": str(e)}))
-        sys.exit(1)
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            data = json.loads(line)
+            result = predict(data)
+            print(json.dumps(result), flush=True)
+        except json.JSONDecodeError as e:
+            print(json.dumps({"error": f"Invalid JSON input: {e}"}), flush=True)
+        except KeyError as e:
+            print(json.dumps({"error": f"Missing field in input: {e}"}), flush=True)
+        except Exception as e:
+            print(json.dumps({"error": str(e)}), flush=True)

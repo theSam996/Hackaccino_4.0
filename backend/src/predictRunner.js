@@ -1,58 +1,75 @@
-const { spawn } = require("child_process");
+const { spawn, spawnSync } = require("child_process");
+const readline = require("readline");
 const path = require("path");
+const fs = require("fs");
 
 const ROOT = path.join(__dirname, "..");
+let pyBin = process.env.PYTHON_BIN || (process.platform === "win32" ? "python" : "python3");
 
-/**
- * @param {Record<string, number>} point — IT + physical fields
- * @returns {Promise<{ anomaly_score: number, is_anomaly: boolean, confidence: number, raw_score: number, divergences: Record<string, number>, error?: string }>}
- */
-function runPredict(point) {
-  const pyBin = process.env.PYTHON_BIN || "python3";
-  const script =
-    process.env.PREDICT_SCRIPT || path.join(ROOT, "ml", "predict.py");
+// Automatically use the virtual environment python if it exists
+const venvPath = path.join(ROOT, "..", ".venv", "Scripts", "python.exe");
+if (!process.env.PYTHON_BIN && fs.existsSync(venvPath)) {
+  pyBin = venvPath;
+}
 
-  return new Promise((resolve) => {
-    let settled = false;
-    const done = (val) => {
-      if (settled) return;
-      settled = true;
-      resolve(val);
-    };
+const script = process.env.PREDICT_SCRIPT || path.join(ROOT, "ml", "predict.py");
 
-    const py = spawn(pyBin, [script], {
-      cwd: ROOT,
-      env: process.env,
-    });
-    let out = "";
-    let err = "";
-    py.stdout.on("data", (d) => {
-      out += d.toString();
-    });
-    py.stderr.on("data", (d) => {
-      err += d.toString();
-    });
-    py.on("error", () => {
-      done(heuristicFallback(point, "spawn failed"));
-    });
-    py.on("close", (code) => {
-      if (code !== 0 || !out.trim()) {
-        done(heuristicFallback(point, err || `exit ${code}`));
-        return;
-      }
+let py = null;
+let pending = null;
+let isShuttingDown = false;
+
+function startPython() {
+  if (py) return;
+
+  py = spawn(pyBin, [script], {
+    cwd: ROOT,
+    env: { ...process.env, PYTHONUNBUFFERED: "1" },
+  });
+
+  const rl = readline.createInterface({ input: py.stdout });
+  rl.on("line", (line) => {
+    if (pending) {
+      const { resolve, point } = pending;
+      pending = null;
       try {
-        const parsed = JSON.parse(out.trim());
+        const parsed = JSON.parse(line);
         if (parsed.error) {
-          done(heuristicFallback(point, parsed.error));
-          return;
+          resolve(heuristicFallback(point, parsed.error));
+        } else {
+          resolve(parsed);
         }
-        done(parsed);
-      } catch {
-        done(heuristicFallback(point, "invalid json"));
+      } catch (err) {
+        resolve(heuristicFallback(point, "invalid json: " + err.message));
       }
-    });
-    py.stdin.write(JSON.stringify(point) + "\n");
-    py.stdin.end();
+    }
+  });
+
+  py.stderr.on("data", (d) => console.error(`[ML Error] ${d.toString().trim()}`));
+
+  py.on("close", (code) => {
+    if (isShuttingDown) return;
+    console.error(`[ML] predict.py exited with code ${code}, restarting in 1s...`);
+    if (pending) {
+      pending.resolve(heuristicFallback(pending.point, `exit ${code}`));
+      pending = null;
+    }
+    py = null;
+    setTimeout(startPython, 1000);
+  });
+}
+
+function runPredict(point) {
+  return new Promise((resolve) => {
+    if (!py) return resolve(heuristicFallback(point, "process unavailable"));
+    if (pending) return resolve(heuristicFallback(point, "prediction already in progress"));
+
+    pending = { resolve, point };
+    try {
+      py.stdin.write(JSON.stringify(point) + "\n");
+    } catch (err) {
+      pending = null;
+      resolve(heuristicFallback(point, "write error"));
+    }
   });
 }
 
@@ -89,5 +106,33 @@ function heuristicFallback(point, reason) {
     fallback_reason: reason,
   };
 }
+
+// ---------------------------------------------------------
+// CLEANUP: Kill Python child on any exit so no zombies remain
+// ---------------------------------------------------------
+function cleanupChildren() {
+  isShuttingDown = true;
+  if (py) {
+    console.log(`[ML] Cleaning up Python child process before exit... (PID: ${py.pid})`);
+    try {
+      if (process.platform === "win32") {
+        spawnSync("taskkill", ["/pid", py.pid, "/f", "/t"]);
+      } else {
+        process.kill(-py.pid, "SIGKILL"); // Kill entire process group
+      }
+      py.kill("SIGKILL");
+    } catch (e) {}
+    py = null;
+  }
+}
+
+// Register signal handlers exactly once
+process.once("exit",   cleanupChildren);
+process.once("SIGINT",  () => { cleanupChildren(); process.exit(0); });
+process.once("SIGTERM", () => { cleanupChildren(); process.exit(0); });
+process.once("SIGUSR2", () => { cleanupChildren(); process.kill(process.pid, "SIGUSR2"); }); // nodemon restart
+
+// Start the singleton Python process when this module is first imported
+startPython();
 
 module.exports = { runPredict, divergencesOf };
