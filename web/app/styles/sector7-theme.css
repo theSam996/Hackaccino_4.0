@@ -90,6 +90,215 @@
   background: #2a2a2a;
 }
 
+/* Reactor topology schematic — marching-ants edges */
+@keyframes s7-topology-dash {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+
+@keyframes s7-topology-dash-reverse {
+  to {
+    stroke-dashoffset: 28;
+  }
+}
+
+@keyframes s7-threat-ring {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes s7-it-breach-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 2px rgba(255, 180, 171, 0.35));
+  }
+  50% {
+    filter: drop-shadow(0 0 10px rgba(255, 180, 171, 0.75));
+  }
+}
+
+@keyframes s7-threat-banner {
+  0%,
+  100% {
+    opacity: 0.88;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Topology edges — marching dashes (classes on each <path> for reliable animation) */
+.s7-topology-dash-line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.s7-topology-dash-ot {
+  stroke: color-mix(in oklab, #ffcaa1 58%, #5ed4ff 42%);
+  stroke-width: 1.5;
+  stroke-dasharray: 8 6;
+  stroke-dashoffset: 0;
+  animation: s7-topology-dash 0.8s linear infinite;
+}
+
+.s7-topology-dash-it {
+  stroke: #5ed4ff;
+  stroke-width: 1.65;
+  stroke-dasharray: 9 6;
+  stroke-dashoffset: 0;
+  animation: s7-topology-dash 0.68s linear infinite;
+  filter: drop-shadow(0 0 4px rgba(94, 212, 255, 0.45));
+}
+
+.s7-topology-dash-attack {
+  stroke: #ffb4ab;
+  stroke-width: 2.1;
+  stroke-dasharray: 6 5;
+  stroke-dashoffset: 0;
+  animation: s7-topology-dash-reverse 0.62s linear infinite;
+  filter: drop-shadow(0 0 7px rgba(255, 180, 171, 0.55));
+}
+
+.s7-topology-dash-threat {
+  stroke: #ffb4ab;
+  stroke-width: 1.65;
+  stroke-dasharray: 5 4;
+  stroke-dashoffset: 0;
+  animation: s7-topology-dash-reverse 0.48s linear infinite;
+  filter: drop-shadow(0 0 5px rgba(255, 180, 171, 0.5));
+}
+
+.s7-topology-threat-pulse {
+  stroke: #ffb4ab;
+  stroke-width: 1.2;
+  animation: s7-threat-ring 1.1s ease-in-out infinite;
+}
+
+.s7-topology-it-net--breach rect {
+  animation: s7-it-breach-glow 1.15s ease-in-out infinite;
+}
+
+.s7-topology-threat-node {
+  animation: s7-threat-banner 1.25s ease-in-out infinite;
+}
+
+/* Reactor topology — ambient motion (disabled with .s7-reduce-motion on html) */
+.s7-topology-backdrop {
+  opacity: 0.35;
+  background-image:
+    linear-gradient(rgba(94, 212, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(94, 212, 255, 0.06) 1px, transparent 1px);
+  background-size: 24px 24px;
+  animation: s7-topology-grid-drift 22s linear infinite;
+}
+
+@keyframes s7-topology-grid-drift {
+  to {
+    background-position:
+      48px 48px,
+      -36px 36px;
+  }
+}
+
+.s7-topology-scene {
+  transform-origin: 210px 124px;
+  transform-box: fill-box;
+  animation: s7-topology-scene-drift 5.5s ease-in-out infinite;
+}
+
+@keyframes s7-topology-scene-drift {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(0, -2px);
+  }
+}
+
+.s7-topology-reactor-hull {
+  animation: s7-topology-hull-pulse 4.2s ease-in-out infinite;
+}
+
+@keyframes s7-topology-hull-pulse {
+  0%,
+  100% {
+    stroke-opacity: 1;
+  }
+  50% {
+    stroke-opacity: 0.55;
+  }
+}
+
+.s7-topology-core-ring {
+  animation: s7-topology-core-breathe 3s ease-in-out infinite;
+}
+
+@keyframes s7-topology-core-breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+    stroke-opacity: 0.25;
+  }
+  50% {
+    opacity: 0.85;
+    stroke-opacity: 0.55;
+  }
+}
+
+.s7-topology-status-led {
+  animation: s7-topology-led 2.2s ease-in-out infinite;
+}
+
+@keyframes s7-topology-led {
+  0%,
+  100% {
+    opacity: 0.72;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+html.s7-reduce-motion .s7-topology-backdrop,
+html.s7-reduce-motion .s7-topology-scene,
+html.s7-reduce-motion .s7-topology-reactor-hull,
+html.s7-reduce-motion .s7-topology-core-ring,
+html.s7-reduce-motion .s7-topology-status-led,
+html.s7-reduce-motion .s7-topology-dash-line {
+  animation: none !important;
+}
+
+/* Operator preferences (Settings page + document flags) */
+html.s7-reduce-motion *,
+html.s7-reduce-motion *::before,
+html.s7-reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+html.s7-high-contrast {
+  filter: contrast(1.14) saturate(1.12);
+}
+
+html[data-telemetry-density="diagnostic"] .s7-live-strip {
+  border-bottom-color: rgba(94, 212, 255, 0.35);
+  background: rgba(20, 20, 20, 0.92);
+}
+
+html[data-telemetry-density="compact"] .s7-live-strip {
+  letter-spacing: 0.02em;
+}
+
 /* Larger type on desktop */
 @media (min-width: 1024px) {
   html {

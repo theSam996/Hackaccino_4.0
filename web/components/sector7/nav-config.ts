@@ -6,6 +6,7 @@ export type NavItem = {
 
 export const PRIMARY_NAV: NavItem[] = [
   { href: "/", label: "Command", icon: "security" },
+  { href: "/log", label: "Log", icon: "terminal" },
   { href: "/telemetry", label: "Telemetry", icon: "monitoring" },
   { href: "/network", label: "Network", icon: "hub" },
   { href: "/sensors", label: "Sensors", icon: "videocam" },

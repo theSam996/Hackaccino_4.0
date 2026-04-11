@@ -1,6 +1,16 @@
 "use client";
 
+import { ReactorTopologySchematic } from "@/components/sector7/ReactorTopologySchematic";
 import { useTelemetryStream } from "@/hooks/useTelemetryStream";
+import {
+  pressureSeries,
+  rpmSeries,
+  syntheticChartHistory,
+  tempSeries,
+  type MetricSeriesRow,
+  vibrationSeries,
+} from "@/lib/chartSeries";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CartesianGrid,
@@ -60,66 +70,201 @@ function LiveBarStack({
   );
 }
 
+const CHART_VARIANTS = {
+  rpm: {
+    shell: "border-l-[3px] border-l-secondary border-y border-r border-outline-variant/20 bg-secondary/[0.07]",
+    titleAccent: "text-secondary",
+    unitClass: "font-mono text-secondary",
+    grid: "rgba(94, 212, 255, 0.14)",
+    it: "#94a3b8",
+    phys: "#5ed4ff",
+    delta: "rgba(255, 180, 171, 0.95)",
+    itWidth: 2,
+    physWidth: 2.5,
+    itDash: undefined as string | undefined,
+    physDash: undefined as string | undefined,
+    itType: "monotone" as const,
+    physType: "monotone" as const,
+    subtitle: "Shaft / drive",
+    formatDeltaTick: (v: number) =>
+      Math.abs(v) >= 500 ? v.toFixed(0) : v.toFixed(1),
+  },
+  temp: {
+    shell: "border-l-[3px] border-l-primary-fixed border-y border-r border-outline-variant/20 bg-primary-fixed/[0.06]",
+    titleAccent: "text-primary-fixed",
+    unitClass: "font-mono text-primary-fixed",
+    grid: "rgba(251, 191, 36, 0.12)",
+    it: "#fcd34d",
+    phys: "#ea580c",
+    delta: "rgba(255, 180, 171, 0.95)",
+    itWidth: 2,
+    physWidth: 2.5,
+    itDash: "6 4",
+    physDash: undefined,
+    itType: "monotone" as const,
+    physType: "basis" as const,
+    subtitle: "Core loop",
+    formatDeltaTick: (v: number) => v.toFixed(1),
+  },
+  pressure: {
+    shell: "border-l-[3px] border-l-[#a78bfa] border-y border-r border-outline-variant/20 bg-[#a78bfa]/[0.07]",
+    titleAccent: "text-[#c4b5fd]",
+    unitClass: "font-mono text-[#c4b5fd]",
+    grid: "rgba(167, 139, 250, 0.14)",
+    it: "#c4b5fd",
+    phys: "#a78bfa",
+    delta: "rgba(255, 180, 171, 0.95)",
+    itWidth: 2,
+    physWidth: 2,
+    itDash: undefined,
+    physDash: "4 3",
+    itType: "stepAfter" as const,
+    physType: "monotone" as const,
+    subtitle: "Steam / RCS",
+    formatDeltaTick: (v: number) => v.toFixed(1),
+  },
+  vibration: {
+    shell: "border-l-[3px] border-l-emerald-400/90 border-y border-r border-outline-variant/20 bg-emerald-500/[0.06]",
+    titleAccent: "text-emerald-300",
+    unitClass: "font-mono text-emerald-300",
+    grid: "rgba(52, 211, 153, 0.12)",
+    it: "#86efac",
+    phys: "#34d399",
+    delta: "rgba(255, 180, 171, 0.95)",
+    itWidth: 1.8,
+    physWidth: 2.5,
+    itDash: "2 3",
+    physDash: undefined,
+    itType: "linear" as const,
+    physType: "monotone" as const,
+    subtitle: "Bearings / casing",
+    formatDeltaTick: (v: number) => v.toFixed(3),
+  },
+} as const;
+
+type ChartVariant = keyof typeof CHART_VARIANTS;
+
 function MiniSyncChart({
   title,
-  dataKeyIt,
-  dataKeyPhys,
   unit,
   data,
+  variant,
 }: {
   title: string;
-  dataKeyIt: string;
-  dataKeyPhys: string;
   unit: string;
-  data: Record<string, string | number>[];
+  data: MetricSeriesRow[];
+  variant: ChartVariant;
 }) {
+  const v = CHART_VARIANTS[variant];
   return (
-    <div className="border border-outline-variant/15 bg-black/20 p-2">
-      <div className="font-label mb-2 text-[11px] uppercase tracking-widest text-on-surface-variant lg:text-xs">
-        {title}{" "}
-        <span className="font-mono text-secondary">({unit})</span>
+    <div className={`p-2 ${v.shell}`}>
+      <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+        <div>
+          <div
+            className={`font-label text-[11px] uppercase tracking-widest lg:text-xs ${v.titleAccent}`}
+          >
+            {title}
+          </div>
+          <div className="font-mono text-[9px] uppercase tracking-wider text-on-surface-variant/80">
+            {v.subtitle}
+          </div>
+        </div>
+        <span className={`text-[10px] ${v.unitClass}`}>({unit})</span>
       </div>
       <div className="h-[200px] w-full min-w-0 sm:h-[220px] lg:h-[248px]">
         <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} syncId="s7">
-          <CartesianGrid stroke="rgba(148,163,184,0.12)" vertical={false} />
-          <XAxis dataKey="t" tick={{ fontSize: 11, fill: "#9ca3af" }} />
-          <YAxis
-            width={44}
-            tick={{ fontSize: 11, fill: "#9ca3af" }}
-            domain={["auto", "auto"]}
-          />
-          <Tooltip
-            contentStyle={{
-              background: "#1c1b1b",
-              border: "1px solid #474747",
-              fontSize: 13,
-            }}
-          />
-          <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Line
-            type="monotone"
-            dataKey={dataKeyIt}
-            name="IT (spoofed)"
-            stroke="#94a3b8"
-            strokeWidth={2}
-            dot={false}
-            isAnimationActive
-            animationDuration={400}
-            animationEasing="ease-out"
-          />
-          <Line
-            type="monotone"
-            dataKey={dataKeyPhys}
-            name="Physical OT"
-            stroke="#5ed4ff"
-            strokeWidth={2}
-            dot={false}
-            isAnimationActive
-            animationDuration={400}
-            animationEasing="ease-out"
-          />
-        </LineChart>
+          <LineChart
+            data={data}
+            margin={{ top: 6, right: 4, left: 2, bottom: 2 }}
+          >
+            <CartesianGrid stroke={v.grid} vertical={false} />
+            <XAxis dataKey="t" tick={{ fontSize: 9, fill: "#9ca3af" }} />
+            <YAxis
+              yAxisId="left"
+              width={44}
+              tick={{ fontSize: 9, fill: "#9ca3af" }}
+              domain={["auto", "auto"]}
+              label={{
+                value: "IT / OT",
+                angle: -90,
+                position: "insideLeft",
+                fill: "#6b7280",
+                fontSize: 9,
+              }}
+            />
+            <YAxis
+              yAxisId="right"
+              orientation="right"
+              width={40}
+              tick={{ fontSize: 9, fill: "#fca5a5" }}
+              tickFormatter={v.formatDeltaTick}
+              domain={["auto", "auto"]}
+              label={{
+                value: "Δ",
+                angle: 90,
+                position: "insideRight",
+                fill: "#f87171",
+                fontSize: 9,
+              }}
+            />
+            <Tooltip
+              contentStyle={{
+                background: "#1c1b1b",
+                border: "1px solid #474747",
+                fontSize: 12,
+              }}
+              formatter={(value, name) => {
+                const raw = value ?? 0;
+                const n = typeof raw === "number" ? raw : Number(raw);
+                const label = String(name ?? "");
+                if (!Number.isFinite(n)) return [String(raw), label];
+                if (label.includes("Δ")) return [v.formatDeltaTick(n), label];
+                if (variant === "rpm") return [n.toFixed(0), label];
+                if (variant === "vibration") return [n.toFixed(3), label];
+                return [n.toFixed(2), label];
+              }}
+            />
+            <Legend wrapperStyle={{ fontSize: 10 }} />
+            <Line
+              yAxisId="left"
+              type={v.itType}
+              dataKey="it"
+              name="IT (spoofed)"
+              stroke={v.it}
+              strokeWidth={v.itWidth}
+              strokeDasharray={v.itDash}
+              dot={false}
+              isAnimationActive
+              animationDuration={400}
+              animationEasing="ease-out"
+            />
+            <Line
+              yAxisId="left"
+              type={v.physType}
+              dataKey="phys"
+              name="Physical OT"
+              stroke={v.phys}
+              strokeWidth={v.physWidth}
+              strokeDasharray={v.physDash}
+              dot={false}
+              isAnimationActive
+              animationDuration={400}
+              animationEasing="ease-out"
+            />
+            <Line
+              yAxisId="right"
+              type="monotone"
+              dataKey="delta"
+              name="Δ (phys−IT)"
+              stroke={v.delta}
+              strokeWidth={1.25}
+              strokeDasharray="3 3"
+              dot={false}
+              isAnimationActive
+              animationDuration={400}
+              animationEasing="ease-out"
+            />
+          </LineChart>
         </ResponsiveContainer>
       </div>
     </div>
@@ -153,6 +298,7 @@ function TimelineDot({
 export default function CommandDashboard() {
   const { frame, connected, error, inject, reset } = useTelemetryStream();
   const [timeline, setTimeline] = useState<TimelineEv[]>([]);
+  const [injectCue, setInjectCue] = useState(false);
   const prevAnomaly = useRef<boolean | null>(null);
 
   useEffect(() => {
@@ -182,23 +328,27 @@ export default function CommandDashboard() {
     }
   }, [frame]);
 
-  const chartData = useMemo(() => {
-    if (frame?.chart?.length) return frame.chart;
-    return [
-      {
-        i: 0,
-        t: "…",
-        it_rpm: 1200,
-        physical_rpm: 1200,
-        it_temp: 285,
-        physical_temp: 285,
-        it_pressure: 72,
-        physical_pressure: 72,
-        it_vibration: 0.12,
-        physical_vibration: 0.12,
-      },
-    ];
-  }, [frame]);
+  useEffect(() => {
+    if (frame?.mode === "attack") setInjectCue(false);
+  }, [frame?.mode]);
+
+  useEffect(() => {
+    if (!injectCue) return;
+    const t = window.setTimeout(() => setInjectCue(false), 6000);
+    return () => window.clearTimeout(t);
+  }, [injectCue]);
+
+  /** Prefer live SSE history; otherwise multi-point synthetic curves so charts are not flat duplicates. */
+  const chartSource = useMemo(() => {
+    const c = frame?.chart;
+    if (c && c.length >= 2) return c;
+    return syntheticChartHistory();
+  }, [frame?.chart]);
+
+  const rpmData = useMemo(() => rpmSeries(chartSource), [chartSource]);
+  const tempData = useMemo(() => tempSeries(chartSource), [chartSource]);
+  const pressureData = useMemo(() => pressureSeries(chartSource), [chartSource]);
+  const vibrationData = useMemo(() => vibrationSeries(chartSource), [chartSource]);
 
   const errPct = frame
     ? (frame.anomaly_score * 100).toFixed(1)
@@ -208,6 +358,12 @@ export default function CommandDashboard() {
   const actHz = frame
     ? Math.round(400 + frame.physical_vibration_mms * 55 + frame.anomaly_score * 80)
     : 418;
+
+  /** Payload / model: next SSE tick sets mode; injectCue flashes the topology immediately on click. */
+  const showAttack =
+    injectCue ||
+    frame?.mode === "attack" ||
+    Boolean(frame?.is_anomaly);
 
   return (
     <>
@@ -235,14 +391,20 @@ export default function CommandDashboard() {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => void inject()}
+            onClick={() => {
+              setInjectCue(true);
+              void inject();
+            }}
             className="border border-error/50 bg-error/20 px-4 py-2 font-label text-[11px] font-bold uppercase tracking-wider text-error hover:bg-error/30 lg:text-xs"
           >
             Inject attack
           </button>
           <button
             type="button"
-            onClick={() => void reset()}
+            onClick={() => {
+              setInjectCue(false);
+              void reset();
+            }}
             className="border border-secondary/50 bg-secondary/15 px-4 py-2 font-label text-[11px] font-bold uppercase tracking-wider text-secondary hover:bg-secondary/25 lg:text-xs"
           >
             Reset plant
@@ -294,15 +456,15 @@ export default function CommandDashboard() {
             />
             <div className="mt-2 flex justify-between font-mono text-xs text-on-surface-variant sm:text-sm">
               <span>PERIMETER</span>
-              <span className={frame?.is_anomaly ? "text-error" : "text-secondary"}>
-                {frame?.is_anomaly ? "ALERT" : "NOMINAL"}
+              <span className={showAttack ? "text-error" : "text-secondary"}>
+                {showAttack ? "ALERT" : "NOMINAL"}
               </span>
             </div>
           </div>
         </div>
         <div
           className={`col-span-12 flex flex-col justify-between border-2 p-4 lg:col-span-4 lg:p-5 ${
-            frame?.is_anomaly
+            showAttack
               ? "border-error/60 bg-error-container/25"
               : "border-outline-variant/30 bg-surface-container-high/40"
           }`}
@@ -317,7 +479,7 @@ export default function CommandDashboard() {
               </div>
             </div>
             <span
-              className={`material-symbols-outlined shrink-0 text-3xl lg:text-4xl ${frame?.is_anomaly ? "animate-pulse text-error" : "text-on-surface-variant"}`}
+              className={`material-symbols-outlined shrink-0 text-3xl lg:text-4xl ${showAttack ? "animate-pulse text-error" : "text-on-surface-variant"}`}
             >
               warning
             </span>
@@ -341,80 +503,53 @@ export default function CommandDashboard() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-5">
-        <div className="col-span-12 flex flex-col gap-4 lg:col-span-4">
-          <div className="flex min-h-[14rem] flex-col overflow-hidden bg-surface-container lg:min-h-0 lg:flex-1">
-            <div className="flex items-center justify-between bg-surface-container-high px-4 py-2.5 lg:py-3">
-              <span className="font-label text-xs uppercase tracking-widest text-white lg:text-sm">
-                SCADA LOG FEED
-              </span>
-              <span className="material-symbols-outlined text-sm text-secondary lg:text-base">
-                terminal
-              </span>
-            </div>
-            <div className="max-h-72 space-y-2 overflow-y-auto p-4 font-mono text-xs sm:text-sm lg:max-h-none lg:flex-1 lg:text-base">
-              {(frame?.scada ?? []).map((row, i) => (
-                <div
-                  key={`${row.t}-${i}`}
-                  className={
-                    row.tone === "secondary"
-                      ? "text-secondary"
-                      : row.tone === "error"
-                        ? "text-error"
-                        : row.tone === "warning"
-                          ? "text-primary-fixed"
-                          : "text-on-surface-variant"
-                  }
-                >
-                  [ {row.t} ] {row.line}
-                </div>
-              ))}
-              {!frame?.scada?.length ? (
-                <div className="text-on-surface-variant">Connecting…</div>
-              ) : null}
-            </div>
-          </div>
-        </div>
-
-        <div className="col-span-12 flex flex-col gap-4 lg:col-span-8">
+        <div className="col-span-12 flex flex-col gap-4">
           <div className="border border-outline-variant/20 bg-surface-container p-3 lg:p-4">
             <div className="font-label mb-3 text-xs uppercase tracking-widest text-white lg:text-sm">
-              IT vs PHYSICAL (synced charts)
+              IT vs PHYSICAL (per-metric history)
             </div>
+            <p className="mb-3 font-mono text-[10px] text-on-surface-variant sm:text-[11px]">
+              Each panel plots only that signal pair from the live buffer plus Δ (physical−IT) on
+              the right axis. SCADA lines live on the{" "}
+              <Link
+                href="/log"
+                className="text-secondary underline decoration-secondary/50 underline-offset-2 hover:text-white"
+              >
+                Log
+              </Link>{" "}
+              page.
+            </p>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <MiniSyncChart
+                variant="rpm"
                 title="Pump / RPM"
                 unit="RPM"
-                dataKeyIt="it_rpm"
-                dataKeyPhys="physical_rpm"
-                data={chartData}
+                data={rpmData}
               />
               <MiniSyncChart
+                variant="temp"
                 title="Temperature"
                 unit="°C"
-                dataKeyIt="it_temp"
-                dataKeyPhys="physical_temp"
-                data={chartData}
+                data={tempData}
               />
               <MiniSyncChart
+                variant="pressure"
                 title="Pressure"
                 unit="bar"
-                dataKeyIt="it_pressure"
-                dataKeyPhys="physical_pressure"
-                data={chartData}
+                data={pressureData}
               />
               <MiniSyncChart
+                variant="vibration"
                 title="Vibration"
                 unit="mm/s"
-                dataKeyIt="it_vibration"
-                dataKeyPhys="physical_vibration"
-                data={chartData}
+                data={vibrationData}
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-5 lg:items-stretch">
             <div className="relative flex min-h-[280px] flex-col overflow-hidden bg-surface-container lg:col-span-3 lg:min-h-[320px]">
-              <div className="flex items-center justify-between bg-surface-container-high px-4 py-2.5">
+              <div className="flex shrink-0 items-center justify-between bg-surface-container-high px-4 py-2.5">
                 <span className="font-label text-xs uppercase tracking-widest text-white lg:text-sm">
                   REACTOR CORE TOPOLOGY
                 </span>
@@ -423,32 +558,21 @@ export default function CommandDashboard() {
                   <span className="h-2.5 w-2.5 bg-secondary" />
                 </div>
               </div>
-              <div className="relative flex flex-1 items-center justify-center bg-black/40 p-4 sm:p-8">
-                <div className="relative aspect-square w-full max-w-md border border-outline-variant/25">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div
-                      className="h-36 w-36 animate-spin rounded-full border-4 border-dashed border-primary-fixed/25 sm:h-44 sm:w-44 lg:h-52 lg:w-52"
-                      style={{ animationDuration: "22s" }}
-                    />
-                    <div className="absolute flex h-28 w-28 items-center justify-center rounded-full border border-secondary/45 sm:h-36 sm:w-36 lg:h-40 lg:w-40">
-                      <div className="flex h-20 w-20 items-center justify-center bg-primary-fixed/10 sm:h-24 sm:w-24">
-                        <span className="material-symbols-outlined fill text-3xl text-primary-fixed lg:text-4xl">
-                          power
-                        </span>
-                      </div>
-                    </div>
-                    {frame?.is_anomaly ? (
-                      <div className="absolute left-2 top-2 flex max-w-[92%] items-center gap-1 bg-error/90 px-2 py-1.5 font-mono text-[11px] text-on-error sm:left-4 sm:top-4 sm:text-xs lg:text-sm">
-                        <span className="material-symbols-outlined text-sm">
-                          warning
-                        </span>
-                        DIVERGENCE &gt; THRESHOLD
-                      </div>
-                    ) : null}
+              <div className="relative min-h-0 flex-1 bg-[#0a0a0c]">
+                <ReactorTopologySchematic
+                  fillContainer
+                  attackActive={showAttack}
+                />
+                {showAttack ? (
+                  <div className="pointer-events-none absolute bottom-2 left-1/2 z-10 flex max-w-[95%] -translate-x-1/2 items-center gap-1 bg-error/90 px-2 py-1 font-mono text-[10px] text-on-error shadow-lg sm:text-xs">
+                    <span className="material-symbols-outlined text-sm">
+                      warning
+                    </span>
+                    {frame?.is_anomaly
+                      ? "Model: divergence above threshold"
+                      : "Attack payload live — physical bus diverging"}
                   </div>
-                  <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-outline-variant/25" />
-                  <div className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-outline-variant/25" />
-                </div>
+                ) : null}
               </div>
             </div>
 
@@ -493,35 +617,38 @@ export default function CommandDashboard() {
                     FREQ ANALYSIS
                   </span>
                 </div>
-                <div className="relative flex flex-1 items-center justify-center p-4">
-                  <div
-                    className="relative h-32 w-32 rounded-full border border-secondary/25 transition-transform duration-500 sm:h-36 sm:w-36 lg:h-40 lg:w-40"
-                    style={{
-                      transform: `rotate(${frame ? frame.anomaly_score * 18 : 0}deg)`,
-                    }}
-                  >
-                    <div className="absolute inset-0 rotate-45 border border-secondary/45" />
-                    <div className="absolute inset-0 -rotate-45 border border-secondary/45" />
+                <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center gap-3 overflow-hidden p-4">
+                  <div className="relative isolate h-32 w-32 shrink-0 overflow-hidden rounded-full border border-secondary/25 sm:h-36 sm:w-36 lg:h-40 lg:w-40">
                     <div
-                      className="absolute inset-2 border-2 border-secondary bg-secondary/10 transition-all duration-500"
+                      className="absolute inset-[5%] flex items-center justify-center overflow-hidden rounded-full"
                       style={{
-                        clipPath:
-                          "polygon(50% 0%, 90% 20%, 100% 50%, 70% 90%, 50% 100%, 10% 80%, 0% 50%, 20% 20%)",
-                        opacity: frame ? 0.45 + frame.anomaly_score * 0.55 : 0.35,
+                        transform: `rotate(${frame ? frame.anomaly_score * 18 : 0}deg)`,
+                        transition: "transform 0.5s ease-out",
                       }}
-                    />
-                    <div
-                      className="absolute inset-2 border border-dashed border-white/35"
-                      style={{
-                        clipPath:
-                          "polygon(50% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%)",
-                      }}
-                    />
+                    >
+                      <div className="relative h-full w-full">
+                        <div className="absolute inset-0 rotate-45 border border-secondary/45" />
+                        <div className="absolute inset-0 -rotate-45 border border-secondary/45" />
+                        <div
+                          className="absolute inset-[10%] border-2 border-secondary bg-secondary/10 transition-all duration-500"
+                          style={{
+                            clipPath:
+                              "polygon(50% 0%, 90% 20%, 100% 50%, 70% 90%, 50% 100%, 10% 80%, 0% 50%, 20% 20%)",
+                            opacity: frame ? 0.45 + frame.anomaly_score * 0.55 : 0.35,
+                          }}
+                        />
+                        <div
+                          className="absolute inset-[10%] border border-dashed border-white/35"
+                          style={{
+                            clipPath:
+                              "polygon(50% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%)",
+                          }}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="absolute bottom-2 left-4 font-mono text-xs text-on-surface-variant sm:text-sm">
-                    EXP: {expHz}Hz
-                    <br />
-                    ACT: {actHz}Hz
+                  <div className="max-w-full text-center font-mono text-[10px] leading-snug text-on-surface-variant sm:text-xs">
+                    EXP: {expHz}Hz · ACT: {actHz}Hz
                   </div>
                 </div>
               </div>
