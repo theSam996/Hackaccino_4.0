@@ -7,8 +7,14 @@ const {
   buildChartPayload,
   getScadaLog,
   getNetPercents,
+  setAttackMode,
+  isAttackMode,
 } = require("./dataEngine");
 const { runPredict } = require("./predictRunner");
+
+// ── Auto-shutdown threshold ──────────────────────────────────────────────────
+const SHUTDOWN_THRESHOLD = 0.99; // 99% anomaly score triggers emergency shutdown
+let plantShutdown = false;       // true after auto-shutdown, cleared on manual reset
 
 /** @type {Set<import('http').ServerResponse>} */
 const clients = new Set();
@@ -51,6 +57,42 @@ async function tick() {
   if (tickBusy) return;
   tickBusy = true;
   try {
+  // ── If plant is already shutdown, broadcast flatlined data ─────────────
+  if (plantShutdown) {
+    const flatPayload = {
+      timestamp: new Date().toISOString(),
+      mode: "shutdown",
+      it_rpm: 0, physical_rpm: 0,
+      it_temp_c: 0, physical_temp_c: 0,
+      it_pressure_bar: 0, physical_pressure_bar: 0,
+      it_vibration_mms: 0, physical_vibration_mms: 0,
+      anomaly_score: 0,
+      is_anomaly: false,
+      confidence: 0,
+      raw_score: 0,
+      divergences: { div_rpm: 0, div_temp: 0, div_pressure: 0, div_vibration: 0 },
+      divergence_pct: { div_rpm: 0, div_temp: 0, div_pressure: 0, div_vibration: 0 },
+      matrix: [
+        { label: "RPM_Δ", value: "0.0%", ok: true, raw: 0 },
+        { label: "TMP_Δ", value: "0.0%", ok: true, raw: 0 },
+        { label: "PRS_Δ", value: "0.0%", ok: true, raw: 0 },
+        { label: "VIB_Δ", value: "0.0%", ok: true, raw: 0 },
+        { label: "NET_W1", value: "0.0%", ok: true, raw: 0 },
+        { label: "NET_W2", value: "0.0%", ok: true, raw: 0 },
+        { label: "NET_W3", value: "0.0%", ok: true, raw: 0 },
+        { label: "NET_W4", value: "0.0%", ok: true, raw: 0 },
+      ],
+      chart: [],
+      scada: getScadaLog(),
+      bars: { motion: Array(10).fill(0), thermal: Array(10).fill(0), vibration: Array(10).fill(0) },
+      alert: false,
+      model_fallback: false,
+      plant_shutdown: true,
+    };
+    broadcast(flatPayload);
+    return;
+  }
+
   const sample = nextSample();
   const point = {
     it_rpm: sample.it_rpm,
@@ -102,6 +144,19 @@ async function tick() {
   const chart = buildChartPayload();
   const bars = barsFromChart(chart);
 
+  // ── Auto-shutdown: if anomaly >= 99% during an active attack, kill the plant
+  if (
+    prediction.anomaly_score >= SHUTDOWN_THRESHOLD &&
+    isAttackMode() &&
+    !plantShutdown
+  ) {
+    plantShutdown = true;
+    setAttackMode(false);
+    console.log(
+      `[AUTO-SHUTDOWN] Anomaly score ${(prediction.anomaly_score * 100).toFixed(1)}% >= ${SHUTDOWN_THRESHOLD * 100}% — plant SCRAMMED`,
+    );
+  }
+
   const payload = {
     timestamp: sample.timestamp,
     mode: sample.mode,
@@ -123,6 +178,7 @@ async function tick() {
     bars,
     alert: prediction.is_anomaly,
     model_fallback: Boolean(prediction.fallback),
+    plant_shutdown: plantShutdown,
   };
 
   broadcast(payload);
@@ -147,9 +203,14 @@ function startLoop() {
   }, ms);
 }
 
+function clearShutdown() {
+  plantShutdown = false;
+}
+
 module.exports = {
   addClient,
   removeClient,
   startLoop,
   broadcast,
+  clearShutdown,
 };

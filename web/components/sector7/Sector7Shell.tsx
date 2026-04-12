@@ -16,6 +16,7 @@ import { PRIMARY_NAV, SECONDARY_NAV, titleForPath } from "./nav-config";
 import { SidebarInjectButton } from "./SidebarInjectButton";
 import { SiteZoneControls } from "./SiteZoneControls";
 import { SiteZoneFooter } from "./SiteZoneFooter";
+import { PlantShutdownOverlay } from "./PlantShutdownOverlay";
 
 function NavLink({
   href,
@@ -204,6 +205,7 @@ function Sector7ShellInner({ children }: { children: React.ReactNode }) {
 
       <SiteZoneFooter />
       <BlueprintBackdrop />
+      <PlantShutdownOverlay />
     </>
   );
 }

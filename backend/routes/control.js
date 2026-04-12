@@ -12,6 +12,7 @@
 const express                                       = require("express");
 const router                                        = express.Router();
 const { setAttackMode, isAttackMode, getAttackIntensity } = require("../src/dataEngine");
+const { clearShutdown }                             = require("../src/sseLoop");
 
 // POST /inject-payload
 router.post("/inject-payload", (req, res) => {
@@ -27,6 +28,7 @@ router.post("/inject-payload", (req, res) => {
 // POST /reset
 router.post("/reset", (req, res) => {
   setAttackMode(false);
+  clearShutdown();
   console.log("[DEMO] System reset to normal baseline");
   res.json({
     status:      "reset_to_normal",

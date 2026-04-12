@@ -13,7 +13,7 @@ export type ScadaLine = {
 
 export type TelemetryFrame = {
   timestamp: string;
-  mode: "normal" | "attack";
+  mode: "normal" | "attack" | "shutdown";
   it_rpm: number;
   physical_rpm: number;
   it_temp_c: number;
@@ -55,6 +55,7 @@ export type TelemetryFrame = {
   bars: { motion: number[]; thermal: number[]; vibration: number[] };
   alert: boolean;
   model_fallback?: boolean;
+  plant_shutdown?: boolean;
 };
 
 export function telemetryStreamUrl(): string {

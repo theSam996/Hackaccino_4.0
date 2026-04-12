@@ -300,11 +300,27 @@ export default function CommandDashboard() {
   const [timeline, setTimeline] = useState<TimelineEv[]>([]);
   const [injectCue, setInjectCue] = useState(false);
   const prevAnomaly = useRef<boolean | null>(null);
+  const prevShutdown = useRef<boolean>(false);
 
   useEffect(() => {
     if (!frame) return;
     const was = prevAnomaly.current;
     prevAnomaly.current = frame.is_anomaly;
+
+    // Detect auto-shutdown transition
+    const isShutdown = Boolean(frame.plant_shutdown);
+    if (isShutdown && !prevShutdown.current) {
+      const ts = frame.timestamp.slice(11, 19);
+      const ev: TimelineEv = {
+        time: ts,
+        color: "error",
+        title: "⚠ EMERGENCY SCRAM — PLANT SHUTDOWN",
+        detail: `Auto-shutdown triggered at ${(frame.anomaly_score * 100).toFixed(1)}% anomaly · all systems halted`,
+      };
+      setTimeline((prev) => [ev, ...prev].slice(0, 12));
+    }
+    prevShutdown.current = isShutdown;
+
     if (was === null) return;
     if (frame.is_anomaly && !was) {
       const ts = frame.timestamp.slice(11, 19);
@@ -365,21 +381,31 @@ export default function CommandDashboard() {
     frame?.mode === "attack" ||
     Boolean(frame?.is_anomaly);
 
+  const showShutdown = Boolean(frame?.plant_shutdown);
+
   return (
     <>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2 font-mono text-xs sm:text-sm lg:text-base">
           <span
             className={`inline-flex items-center gap-2 border px-3 py-1.5 ${
-              connected
-                ? "border-secondary/40 bg-secondary/10 text-secondary"
-                : "border-error/40 bg-error/10 text-error"
+              showShutdown
+                ? "border-error bg-error/20 text-error"
+                : connected
+                  ? "border-secondary/40 bg-secondary/10 text-secondary"
+                  : "border-error/40 bg-error/10 text-error"
             }`}
           >
             <span
-              className={`h-2 w-2 rounded-full ${connected ? "animate-pulse bg-secondary" : "bg-error"}`}
+              className={`h-2 w-2 rounded-full ${
+                showShutdown
+                  ? "bg-error"
+                  : connected
+                    ? "animate-pulse bg-secondary"
+                    : "bg-error"
+              }`}
             />
-            {connected ? "LIVE SSE" : "OFFLINE"}
+            {showShutdown ? "SCRAMMED" : connected ? "LIVE SSE" : "OFFLINE"}
           </span>
           {frame?.model_fallback ? (
             <span className="text-primary-fixed">ML fallback (train model)</span>
@@ -391,11 +417,16 @@ export default function CommandDashboard() {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
+            disabled={showShutdown}
             onClick={() => {
               setInjectCue(true);
               void inject();
             }}
-            className="border border-error/50 bg-error/20 px-4 py-2 font-label text-[11px] font-bold uppercase tracking-wider text-error hover:bg-error/30 lg:text-xs"
+            className={`border px-4 py-2 font-label text-[11px] font-bold uppercase tracking-wider lg:text-xs ${
+              showShutdown
+                ? "cursor-not-allowed border-outline-variant/30 bg-surface-container text-on-surface-variant/40"
+                : "border-error/50 bg-error/20 text-error hover:bg-error/30"
+            }`}
           >
             Inject attack
           </button>
