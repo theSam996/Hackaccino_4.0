@@ -40,7 +40,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="bg-background text-on-background font-body min-h-dvh overflow-x-hidden overflow-y-auto text-sm sm:text-base">
+      <body className="bg-background text-on-background font-body min-h-dvh overflow-x-hidden overflow-y-auto">
         {children}
       </body>
     </html>
