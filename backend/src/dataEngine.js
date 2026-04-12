@@ -52,7 +52,7 @@ function withNoise(base, pct = 0.04) {
 
 /**
  * Generate one timestamped sensor data point.
- * Called every STREAM_INTERVAL_MS by sseStream.js.
+ * Called every STREAM_INTERVAL_MS by sseLoop.js.
  */
 function generateSample() {
   // Smoothly ramp attack intensity up on attack, recover faster on reset
@@ -90,6 +90,142 @@ function generateSample() {
   };
 }
 
+// ── Chart history ring buffer ─────────────────────────────────────────────────
+const CHART_MAX = 30;
+const chartHistory = [];
+let chartIndex = 0;
+
+// ── SCADA log ring buffer ─────────────────────────────────────────────────────
+const SCADA_MAX = 20;
+const scadaLog = [];
+
+// ── Neural-network simulated weights ──────────────────────────────────────────
+const netNodes = { w1: 2.0, w2: 3.0, w3: 1.5, w4: 2.5 };
+
+// ── Divergence thresholds for percentage scaling ─────────────────────────────
+const DIV_RANGE = {
+  div_rpm: 2800,
+  div_temp: 360,
+  div_pressure: 75,
+  div_vibration: 2.8,
+};
+
+/**
+ * nextSample — wraps generateSample, adds mode field,
+ * and pushes data into the chart history ring buffer.
+ */
+function nextSample() {
+  const sample = generateSample();
+  sample.mode = attackMode ? "attack" : "normal";
+
+  // Push into chart ring buffer
+  const chartPoint = {
+    i: chartIndex++,
+    t: new Date().toLocaleTimeString("en-GB", { hour12: false }).slice(0, 8),
+    it_rpm: sample.it_rpm,
+    physical_rpm: sample.physical_rpm,
+    it_temp: sample.it_temp_c,
+    physical_temp: sample.physical_temp_c,
+    it_pressure: sample.it_pressure_bar,
+    physical_pressure: sample.physical_pressure_bar,
+    it_vibration: sample.it_vibration_mms,
+    physical_vibration: sample.physical_vibration_mms,
+  };
+  chartHistory.push(chartPoint);
+  if (chartHistory.length > CHART_MAX) chartHistory.shift();
+
+  return sample;
+}
+
+/**
+ * Compute divergences from a raw sample.
+ */
+function divergencesFromSample(sample) {
+  return {
+    div_rpm:       sample.physical_rpm - sample.it_rpm,
+    div_temp:      sample.physical_temp_c - sample.it_temp_c,
+    div_pressure:  sample.physical_pressure_bar - sample.it_pressure_bar,
+    div_vibration: sample.physical_vibration_mms - sample.it_vibration_mms,
+  };
+}
+
+/**
+ * Convert raw divergences to percentage (0-100) scale for the matrix UI.
+ */
+function pctFromDiv(divs) {
+  return {
+    div_rpm:       Math.min(100, (Math.abs(divs.div_rpm) / DIV_RANGE.div_rpm) * 100),
+    div_temp:      Math.min(100, (Math.abs(divs.div_temp) / DIV_RANGE.div_temp) * 100),
+    div_pressure:  Math.min(100, (Math.abs(divs.div_pressure) / DIV_RANGE.div_pressure) * 100),
+    div_vibration: Math.min(100, (Math.abs(divs.div_vibration) / DIV_RANGE.div_vibration) * 100),
+  };
+}
+
+/**
+ * Simulate neural-network weight perturbation on each tick.
+ */
+function tickNetNodes(anomalyScore) {
+  const perturb = () => gaussianNoise() * 1.2;
+  const drift = anomalyScore * 15;
+  netNodes.w1 = Math.max(0, Math.min(100, netNodes.w1 + perturb() + drift * 0.3));
+  netNodes.w2 = Math.max(0, Math.min(100, netNodes.w2 + perturb() + drift * 0.2));
+  netNodes.w3 = Math.max(0, Math.min(100, netNodes.w3 + perturb() + drift * 0.4));
+  netNodes.w4 = Math.max(0, Math.min(100, netNodes.w4 + perturb() + drift * 0.1));
+}
+
+/**
+ * Push a SCADA log entry based on prediction results.
+ */
+function onPrediction(isAnomaly, score) {
+  const ts = new Date().toLocaleTimeString("en-GB", { hour12: false }).slice(0, 8);
+  if (isAnomaly) {
+    scadaLog.push({
+      t: ts,
+      line: "ANOMALY score=" + (score * 100).toFixed(1) + "%",
+      tone: "error",
+    });
+  } else if (score > 0.3) {
+    scadaLog.push({
+      t: ts,
+      line: "ELEVATED score=" + (score * 100).toFixed(1) + "%",
+      tone: "warning",
+    });
+  } else {
+    scadaLog.push({
+      t: ts,
+      line: "NOMINAL score=" + (score * 100).toFixed(1) + "%",
+      tone: "default",
+    });
+  }
+  if (scadaLog.length > SCADA_MAX) scadaLog.shift();
+}
+
+/**
+ * Return the current chart history array.
+ */
+function buildChartPayload() {
+  return chartHistory.slice();
+}
+
+/**
+ * Return the current SCADA log.
+ */
+function getScadaLog() {
+  return scadaLog.slice();
+}
+
+/**
+ * Return current simulated neural-network percentages.
+ */
+function getNetPercents() {
+  return {
+    w1: +netNodes.w1.toFixed(2),
+    w2: +netNodes.w2.toFixed(2),
+    w3: +netNodes.w3.toFixed(2),
+    w4: +netNodes.w4.toFixed(2),
+  };
+}
+
 // ── State accessors ───────────────────────────────────────────────────────────
 function setAttackMode(val) {
   attackMode = Boolean(val);
@@ -99,4 +235,17 @@ function setAttackMode(val) {
 function isAttackMode()      { return attackMode; }
 function getAttackIntensity() { return attackIntensity; }
 
-module.exports = { generateSample, setAttackMode, isAttackMode, getAttackIntensity };
+module.exports = {
+  generateSample,
+  nextSample,
+  divergencesFromSample,
+  pctFromDiv,
+  tickNetNodes,
+  onPrediction,
+  buildChartPayload,
+  getScadaLog,
+  getNetPercents,
+  setAttackMode,
+  isAttackMode,
+  getAttackIntensity,
+};

@@ -11,7 +11,7 @@
  *
  * NOTE: The SSE broadcast loop is NOT started here.
  * It starts automatically when the first SSE client connects
- * (via addClient in sseStream.js) and pauses when no clients remain.
+ * (via addClient in sseLoop.js) and pauses when no clients remain.
  */
 
 "use strict";

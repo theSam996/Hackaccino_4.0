@@ -11,15 +11,15 @@
  *   timestamp, it_rpm, it_temp_c, it_pressure_bar, it_vibration_mms,
  *   physical_rpm, physical_temp_c, physical_pressure_bar, physical_vibration_mms,
  *   attack_intensity, anomaly_score, is_anomaly, confidence, raw_score,
- *   divergences, alert
+ *   divergences, divergence_pct, matrix, chart, scada, bars, alert
  * }
  */
 
 "use strict";
 
-const express                     = require("express");
-const router                      = express.Router();
-const { addClient, removeClient } = require("../src/sseStream");
+const express                                = require("express");
+const router                                 = express.Router();
+const { addClient, removeClient, startLoop } = require("../src/sseLoop");
 
 router.get("/stream", (req, res) => {
   // ── Set SSE headers ────────────────────────────────────────────────────────
@@ -34,6 +34,7 @@ router.get("/stream", (req, res) => {
 
   // ── Register this response object with the broadcaster ────────────────────
   addClient(res);
+  startLoop(); // start broadcast loop (no-op if already running)
 
   // ── Clean up when client disconnects ──────────────────────────────────────
   req.on("close",  () => removeClient(res));

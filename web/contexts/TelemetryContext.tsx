@@ -1,7 +1,7 @@
 "use client";
 
 import type { TelemetryFrame } from "@/lib/telemetry";
-import { telemetryApiPath, telemetryStreamUrl } from "@/lib/telemetry";
+import { telemetryApiPath } from "@/lib/telemetry";
 import {
   createContext,
   useCallback,
@@ -24,6 +24,19 @@ export const TelemetryContext = createContext<TelemetryContextValue | null>(
   null,
 );
 
+/**
+ * SSE URL — connect DIRECTLY to the backend on :8000.
+ * Going through the Next.js rewrite proxy causes ECONNRESET / buffering
+ * because Next.js is not designed to proxy long-lived SSE connections.
+ */
+function sseUrl(): string {
+  if (typeof window === "undefined") return "";
+  // In production you'd use an env var; for dev, backend is always on :8000
+  const backendOrigin =
+    process.env.NEXT_PUBLIC_TELEMETRY_API_URL || "http://localhost:8000";
+  return `${backendOrigin}/stream`;
+}
+
 export function TelemetryProvider({ children }: { children: ReactNode }) {
   const [frame, setFrame] = useState<TelemetryFrame | null>(null);
   const [connected, setConnected] = useState(false);
@@ -31,7 +44,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
   const esRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
-    const url = telemetryStreamUrl();
+    const url = sseUrl();
     if (!url) return;
 
     const es = new EventSource(url);

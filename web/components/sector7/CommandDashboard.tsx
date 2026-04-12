@@ -171,8 +171,8 @@ function MiniSyncChart({
         </div>
         <span className={`text-[10px] ${v.unitClass}`}>({unit})</span>
       </div>
-      <div className="h-[200px] w-full min-w-0 sm:h-[220px] lg:h-[248px]">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="h-[200px] w-full min-w-[1px] sm:h-[220px] lg:h-[248px]">
+        <ResponsiveContainer width="100%" height="100%" minWidth={1}>
           <LineChart
             data={data}
             margin={{ top: 6, right: 4, left: 2, bottom: 2 }}
@@ -492,7 +492,7 @@ export default function CommandDashboard() {
                 {frame.divergences.div_pressure.toFixed(1)} · vib{" "}
                 {frame.divergences.div_vibration.toFixed(2)}
                 <br />
-                [MODE] {frame.mode.toUpperCase()} · conf{" "}
+                [MODE] {(frame.mode ?? "—").toUpperCase()} · conf{" "}
                 {(frame.confidence * 100).toFixed(0)}%
               </>
             ) : (

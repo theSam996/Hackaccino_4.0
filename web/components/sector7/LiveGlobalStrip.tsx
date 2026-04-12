@@ -74,7 +74,7 @@ export function LiveGlobalStrip() {
                     frame.mode === "attack" ? "text-error" : "text-secondary"
                   }
                 >
-                  {frame.mode.toUpperCase()}
+                  {(frame.mode ?? "—").toUpperCase()}
                 </span>
               </span>
               <span>
